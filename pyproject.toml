@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fatereasoner"
+version = "0.1.0"
+description = "Evidence-grounded LLM reasoning for prioritizing cell-fate regulators."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Junyao Jiang" }]
+keywords = ["single-cell", "gene regulatory network", "cell fate", "large language model", "literature mining"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+biomedical = ["torch>=2.0", "transformers>=4.40"]
+dev = ["pytest>=8.0"]
+
+[project.urls]
+Homepage = "https://github.com/jiang-junyao/FateReasoner"
+Issues = "https://github.com/jiang-junyao/FateReasoner/issues"
+
+[project.scripts]
+fatereasoner = "fatereasoner.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

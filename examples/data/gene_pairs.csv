@@ -1,0 +1,5 @@
+candidate_id,source_gene,target_gene,relation_type,data_score
+Nfia->Hes1,Nfia,Hes1,TF_target,0.63
+Nfia->Pax6,Nfia,Pax6,TF_target,0.71
+Nfix->Trim2,Nfix,Trim2,TF_target,0.94
+Sox9->Nfia,Sox9,Nfia,TF_target,0.58

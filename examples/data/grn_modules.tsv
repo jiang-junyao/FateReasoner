@@ -1,0 +1,11 @@
+regulator_symbol	source_module	target_symbol	target_module	expression_correlation	regulation_type
+Nfia	M2	Hes1	M1	0.63	Positive
+Nfix	M2	Hes1	M1	0.58	Positive
+Nfib	M2	Lhx2	M2	0.55	Positive
+Lhx2	M2	Nfia	M2	0.61	Positive
+Klf6	M7	Nfia	M2	-0.66	Negative
+Sox9	M7	Pax6	M2	-0.52	Negative
+Stat3	M6	Klf6	M7	0.70	Positive
+Myc	M6	Sox9	M7	0.49	Positive
+Klf6	M7	Stat3	M6	0.45	Positive
+Sox9	M7	Hes1	M1	-0.41	Negative
