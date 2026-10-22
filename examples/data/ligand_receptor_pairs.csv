@@ -2,4 +2,4 @@ candidate_id,source_gene,target_gene,sender_celltype,receiver_celltype,relation_
 SPP1->CD44,SPP1,CD44,SPP1+ macrophage,tumor,ligand_receptor,1.00
 THBS1->SDC1,THBS1,SDC1,myofibroblastic CAF,tumor core,ligand_receptor,0.13
 COL1A1->CD44,COL1A1,CD44,myofibroblastic CAF,tumor core,ligand_receptor,0.59
-APOE->SORL1,APOE,SORL1,SPP1+ macrophage,tumor,ligand_receptor,0.98
+APOE->LSR,APOE,LSR,SPP1+ macrophage,tumor,ligand_receptor,0.98

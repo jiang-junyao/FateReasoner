@@ -53,6 +53,8 @@ def add_score_gene_pairs_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--sort-col", default="data_score", help="Column used before --top-n, if present.")
     parser.add_argument("--method", choices=SCORING_METHODS, default="distilled_plus_prior")
     parser.add_argument("--retmax", type=int, default=30)
+    parser.add_argument("--full-text", choices=["none", "pmc-oa"], default="pmc-oa",
+                        help="Full-text retrieval: pmc-oa adds open-access PubMed Central full texts when available (default); none uses titles and abstracts only.")
     parser.add_argument(
         "--retrieval-policy",
         choices=["legacy", "pair_cascade"],
@@ -218,6 +220,7 @@ def build_gene_pair_distilled_packets(
         date_cutoff=args.date_cutoff,
         delay_seconds=args.delay_seconds,
         exclude_pmids=parse_exclude_pmids(getattr(args, "exclude_pmids", "")),
+        full_text_mode=getattr(args, "full_text", "pmc-oa"),
         retrieval_policy=getattr(args, "retrieval_policy", "legacy"),
     )
     cache = JsonlRetrievalCache(out_dir / "gene_pair_retrieval_cache.jsonl")
@@ -327,7 +330,7 @@ class GenePairPubMedClient(PubMedClient):
                         seen.add(pmid)
                 if len(ids) >= self.retmax:
                     break
-        docs = self.fetch(ids)
+        docs = self.fetch_with_full_text(ids)
         for rank, doc in enumerate(docs, start=1):
             doc.pubmed_rank = rank
         return docs

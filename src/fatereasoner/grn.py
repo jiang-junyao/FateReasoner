@@ -77,6 +77,8 @@ def add_score_grn_modules_parser(subparsers: argparse._SubParsersAction) -> None
     module_parser.add_argument("--module-evidence-max-docs", type=int, default=30)
     module_parser.add_argument("--method", choices=SCORING_METHODS, default="distilled_plus_prior")
     module_parser.add_argument("--retmax", type=int, default=30)
+    module_parser.add_argument("--full-text", choices=["none", "pmc-oa"], default="pmc-oa",
+                               help="Full-text retrieval: pmc-oa adds open-access PubMed Central full texts when available (default); none uses titles and abstracts only.")
     module_parser.add_argument("--date-cutoff", default=None)
     module_parser.add_argument("--delay-seconds", type=float, default=0.34)
     module_parser.add_argument("--retrieval-timeout", type=int, default=12, help="Per-request PubMed timeout in seconds.")
@@ -330,6 +332,7 @@ def build_module_distilled_packets(
         date_cutoff=args.date_cutoff,
         delay_seconds=args.delay_seconds,
         exclude_pmids=parse_exclude_pmids(getattr(args, "exclude_pmids", "")),
+        full_text_mode=getattr(args, "full_text", "pmc-oa"),
     )
     pubmed.context = context
     cache = JsonlRetrievalCache(out_dir / "module_retrieval_cache.jsonl")
@@ -456,7 +459,7 @@ class ModulePubMedClient(PubMedClient):
                     try:
                         self.retmax = self.per_gene_retmax
                         ids = self.search(self.build_gene_query(gene, candidate.get("species", ""), context))
-                        self._gene_document_cache[key] = self.fetch(ids)
+                        self._gene_document_cache[key] = self.fetch_with_full_text(ids)
                     finally:
                         self.retmax = original_retmax
                     if self.gene_cache is not None:
@@ -484,7 +487,7 @@ class ModulePubMedClient(PubMedClient):
                         ids = self.search(self.build_module_block_query(source_block, target_block, species, strict=True))
                         if not ids:
                             ids = self.search(self.build_module_block_query(source_block, target_block, species, strict=False))
-                        cached = self.fetch(ids)
+                        cached = self.fetch_with_full_text(ids)
                     except RuntimeError:
                         cached = []
                     finally:
@@ -523,7 +526,7 @@ class ModulePubMedClient(PubMedClient):
                     ids = self.search(self.build_pair_batch_query(chunk, species, context))
                     if not ids:
                         ids = self.search(self.build_pair_batch_query(chunk, "", ""))
-                    documents = self.fetch(ids)
+                    documents = self.fetch_with_full_text(ids)
                 except RuntimeError:
                     documents = []
             finally:

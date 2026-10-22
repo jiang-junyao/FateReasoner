@@ -54,7 +54,7 @@ class GeneScoringConfig:
     precomputed_packets: str | None = None
     method: ScoringMethod = "distilled_plus_prior"
     retmax: int = 30
-    full_text: Literal["none", "pmc-oa"] = "none"
+    full_text: Literal["none", "pmc-oa"] = "pmc-oa"
     date_cutoff: str | None = None
     delay_seconds: float = 0.34
     exclude_pmids: str | tuple[str, ...] = ""
@@ -97,6 +97,7 @@ class GRNModuleScoringConfig:
     module_evidence_max_docs: int = 30
     method: ScoringMethod = "distilled_plus_prior"
     retmax: int = 30
+    full_text: Literal["none", "pmc-oa"] = "pmc-oa"
     date_cutoff: str | None = None
     delay_seconds: float = 0.34
     retrieval_timeout: int = 12
@@ -135,6 +136,7 @@ class GenePairScoringConfig:
     sort_col: str = "data_score"
     method: ScoringMethod = "distilled_plus_prior"
     retmax: int = 30
+    full_text: Literal["none", "pmc-oa"] = "pmc-oa"
     date_cutoff: str | None = None
     delay_seconds: float = 0.34
     exclude_pmids: str | tuple[str, ...] = ""

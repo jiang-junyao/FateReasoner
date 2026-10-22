@@ -81,7 +81,8 @@ def add_score_genes_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     parser.add_argument("--gene-col", default=None, help="Gene column for CSV/TSV input. Auto-detected by default.")
     parser.add_argument("--retmax", type=int, default=30, help="PubMed records retrieved per gene before filtering.")
-    parser.add_argument("--full-text", choices=["none", "pmc-oa"], default="none")
+    parser.add_argument("--full-text", choices=["none", "pmc-oa"], default="pmc-oa",
+                        help="Full-text retrieval: pmc-oa adds open-access PubMed Central full texts when available (default); none uses titles and abstracts only.")
     parser.add_argument("--date-cutoff", default=None, help="Latest allowed PubMed publication date, YYYY-MM-DD.")
     parser.add_argument("--delay-seconds", type=float, default=0.34)
     parser.add_argument(

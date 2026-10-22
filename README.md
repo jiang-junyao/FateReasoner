@@ -1,19 +1,24 @@
-# FateReasoner
+<h1 align="center">FateReasoner</h1>
 
-**Evidence-grounded LLM reasoning for prioritizing cell-fate regulators.**
+<p align="center">
+  <b>Evidence-grounded LLM reasoning for prioritizing regulators of cell fate</b>
+</p>
 
-Single-cell and spatial analyses produce long candidate lists: differentially expressed genes, TF–target edges from a gene regulatory network (GRN), regulatory modules, and ligand–receptor pairs. FateReasoner re-ranks these candidates for a specific cell state. For each candidate it retrieves PubMed literature, distills the passages that match the cell-state context into a structured evidence packet, and asks an LLM to score the candidate using that packet together with its prior knowledge. Every score can be traced back to the PMIDs it rests on.
+<p align="center">
+  <img src="docs/overview.png" alt="FateReasoner overview" width="100%">
+</p>
 
-![FateReasoner workflow](docs/workflow.png)
+Single-cell, spatial and multiomic analyses produce long lists of candidate regulators: differentially expressed genes, TF–target edges, gene regulatory network (GRN) modules and ligand–receptor pairs. Data-driven scores tell you how strongly a candidate is associated with a cell state, but not whether the literature supports it as a regulator of the fate transition you are studying.
 
-FateReasoner works on top of your own analysis. It does not call DEGs, infer GRNs or compute cell–cell communication; it takes their output as candidates.
+FateReasoner adds that layer. For each candidate it retrieves PubMed literature, distills the passages that match your biological context into a compact evidence packet, and asks a large language model (LLM) to weigh this evidence together with its prior knowledge. The result is an **evidence score** for every candidate, linked to the publications that support it.
 
-| Regulatory layer | Candidates | Function |
-| --- | --- | --- |
-| Intrinsic regulators | genes, TFs | `score_genes` |
-| Regulatory circuits | TF → target edges | `score_gene_pairs` |
-| Regulatory circuits | module → module relationships | `score_grn_modules` |
-| Niche signals | ligand → receptor pairs | `score_gene_pairs` |
+- **Context-matched evidence.** Evidence is selected for the cell fate transition you describe, not for the gene in general.
+- **Traceable.** Every score comes with the supporting PMIDs, an evidence level and a short rationale.
+- **One workflow across regulatory layers.** Genes, TF–target edges, GRN modules and ligand–receptor pairs.
+- **Model-agnostic.** Works with DeepSeek, OpenAI GPT, Anthropic Claude, Google Gemini, Zhipu GLM and Alibaba Qwen.
+- **Works on top of your analysis.** FateReasoner does not call DEGs, infer GRNs or compute cell–cell communication; it takes their output as input.
+
+---
 
 ## Installation
 
@@ -29,11 +34,11 @@ cd FateReasoner
 pip install -e .
 ```
 
-Python ≥ 3.9 is required. The default distillation is lightweight and needs only `numpy`, `pandas` and `requests`. The optional transformer-based distillation (`distill_evidence="biomedbert_rerank"` or `"medcpt_go"`) needs `pip install -e ".[biomedical]"`.
+Python ≥ 3.9 is required. The default pipeline needs only `numpy`, `pandas` and `requests`. The optional transformer-based evidence selection (`distill_evidence="biomedbert_rerank"` or `"medcpt_go"`) needs `pip install -e ".[biomedical]"`.
 
-## LLM providers
+## Set up an LLM
 
-FateReasoner has **no default provider**; choose one explicitly for every scoring run. API keys are read from the environment variable below, from `api_key_file=`, or from `api_key=`.
+FateReasoner has **no default provider**: choose one for every run. The API key is read from the environment variable below, or passed with `api_key=` / `api_key_file=`.
 
 | `provider` | Environment variable |
 | --- | --- |
@@ -44,118 +49,105 @@ FateReasoner has **no default provider**; choose one explicitly for every scorin
 | `glm` | `ZHIPUAI_API_KEY` |
 | `qwen` | `DASHSCOPE_API_KEY` |
 
-Each provider has a preset model, but model names change over time, so set `model=` explicitly for reproducible runs.
+Each provider has a preset model. Model names change over time, so set `model=` explicitly for reproducible runs.
 
-Retrieval and distillation need no API key. Setting `prepare_only=True` (or `--prepare-only`) stops after building the evidence packets, which is useful for inspecting the evidence before paying for LLM calls.
+PubMed retrieval needs no key. Setting `NCBI_EMAIL` and `NCBI_API_KEY` is recommended for faster, more reliable access to NCBI.
 
 ## Quick start
 
-### Score candidate genes
+Pick the function that matches your candidates. Each call is one line; the example files are in [`examples/data`](examples/data).
+
+| Your candidates | Typical source | Function |
+| --- | --- | --- |
+| Genes or TFs | differential expression, TF ranking | `score_genes` |
+| TF → target edges | GRN inference | `score_gene_pairs` |
+| Module → module regulation | module-annotated GRN (e.g. IReNA) | `score_grn_modules` |
+| Ligand → receptor pairs | cell–cell communication (e.g. CellChat, LIANA) | `score_gene_pairs` |
 
 ```python
-from fatereasoner import GeneScoringConfig, score_genes
+from fatereasoner import *
 
-result = score_genes(
-    genes=["TBXT", "MIXL1", "EOMES", "SOX17", "FOXA2", "ACTB"],
-    context="human embryonic stem cell differentiation toward definitive endoderm",
-    out="results/genes",
-    config=GeneScoringConfig(provider="claude", model="claude-sonnet-4-5"),
-)
-print(result.result[["GENE", "score", "evidence_level", "supporting_pmids"]])
+# Genes or TFs
+score_genes("examples/data/hesc_candidate_genes.csv", "examples/data/hesc_context.txt", "results/genes", gene_col="GENE", config=GeneScoringConfig(provider="deepseek"))
+
+# TF -> target edges
+score_gene_pairs("examples/data/gene_pairs.csv", "examples/data/retina_context.txt", "results/tf_target", config=GenePairScoringConfig(provider="deepseek"))
+
+# GRN module -> module regulation
+score_grn_modules("examples/data/grn_modules.tsv", "mouse", "examples/data/retina_context.txt", "results/modules", config=GRNModuleScoringConfig(provider="deepseek"))
+
+# Ligand -> receptor pairs
+score_gene_pairs("examples/data/ligand_receptor_pairs.csv", "examples/data/tumor_context.txt", "results/lr", config=GenePairScoringConfig(provider="deepseek"))
 ```
 
-`genes` can also be a text file (one gene per line) or a CSV/TSV table with `gene_col=`. `context` can be a string or a path to a text file.
+Each call returns a `ScoringResult`; `result.result` is the final table as a `pandas.DataFrame`.
 
-### Score gene pairs (TF → target, ligand → receptor)
-
-```python
-from fatereasoner import GenePairScoringConfig, score_gene_pairs
-
-result = score_gene_pairs(
-    pairs="examples/data/ligand_receptor_pairs.csv",
-    context="oral squamous cell carcinoma tumor microenvironment, fibroblast-tumor communication",
-    out="results/lr_pairs",
-    config=GenePairScoringConfig(provider="deepseek", model="deepseek-chat"),
-)
-print(result.result[["candidate_id", "data_score", "fatereasoner_score", "evidence_quadrant"]])
-```
-
-The pair table needs `source_gene` and `target_gene`. Optional columns: `candidate_id`, `data_score` (your own score, e.g. a CellChat probability or edge weight, kept as an independent axis), `relation_type` (`tf_target` or `ligand_receptor`), and `sender_celltype` / `receiver_celltype` for ligand–receptor pairs. Pairs with sender/receiver cell types are treated as ligand–receptor pairs automatically.
-
-### Score GRN module pairs
-
-```python
-from fatereasoner import GRNModuleScoringConfig, score_grn_modules
-
-result = score_grn_modules(
-    network="examples/data/grn_modules.tsv",
-    species="mouse",
-    context="mouse retinal Muller glia returning to quiescence after injury",
-    out="results/grn_modules",
-    config=GRNModuleScoringConfig(top_module_pairs=10, provider="gpt", model="gpt-4.1"),
-)
-```
-
-The network table needs `regulator_symbol`, `source_module`, `target_symbol` and `target_module`; `expression_correlation` and `regulation_type` are optional. [IReNA](https://github.com/jiang-junyao/IReNA) output for mouse or zebrafish is accepted as is.
-
-### Command line
-
-The same workflows are available from the shell:
+The same workflows are available from the command line:
 
 ```bash
-fatereasoner score-genes --genes examples/data/hesc_candidate_genes.csv --gene-col GENE \
-    --context examples/data/hesc_context.txt --out results/genes \
-    --provider claude --model claude-sonnet-4-5
-
-fatereasoner score-gene-pairs --pairs examples/data/gene_pairs.csv \
-    --context examples/data/retina_context.txt --out results/tf_target --prepare-only
-
-fatereasoner score-grn-modules --network examples/data/grn_modules.tsv --species mouse \
-    --context examples/data/retina_context.txt --out results/grn_modules --provider deepseek
+fatereasoner score-genes --genes examples/data/hesc_candidate_genes.csv --gene-col GENE --context examples/data/hesc_context.txt --out results/genes --provider deepseek
+fatereasoner score-gene-pairs --pairs examples/data/gene_pairs.csv --context examples/data/retina_context.txt --out results/tf_target --provider deepseek
+fatereasoner score-grn-modules --network examples/data/grn_modules.tsv --species mouse --context examples/data/retina_context.txt --out results/modules --provider deepseek
 ```
 
 Run `fatereasoner <command> --help` for all options.
 
-## Examples
+> **Tip.** Add `prepare_only=True` (or `--prepare-only`) to stop after building the evidence packets. This needs no LLM key and lets you inspect the evidence before paying for LLM calls.
 
-`examples/` contains three runnable scripts with small input files in `examples/data/`. Without `--provider` they stop after evidence distillation, so they run without an API key:
+## Inputs
 
-```bash
-python examples/01_score_genes.py                       # genes, hESC -> definitive endoderm
-python examples/02_score_gene_pairs.py                  # TF -> target and ligand -> receptor pairs
-python examples/03_score_grn_modules.py                 # GRN module pairs
+**Context.** A short description of the cell fate transition, as a string or a text file, for example *"mouse retinal Müller glia returning to quiescence after injury"*. Tissue, condition, cell types and marker genes all help evidence selection.
 
-python examples/01_score_genes.py --provider claude --model claude-sonnet-4-5   # full scoring
-```
+**Genes.** A Python list, a text file with one gene per line, or a CSV/TSV table (set `gene_col=`).
+
+**Gene pairs.** A CSV/TSV table with `source_gene` and `target_gene`. Optional columns:
+
+| Column | Meaning |
+| --- | --- |
+| `candidate_id` | your identifier for the pair |
+| `data_score` | your own score (edge weight, CellChat probability, LIANA rank…), kept as an independent axis |
+| `relation_type` | `tf_target` or `ligand_receptor` |
+| `sender_celltype`, `receiver_celltype` | cell types for ligand–receptor pairs; their presence marks a pair as ligand–receptor |
+
+**GRN modules.** An edge table with `regulator_symbol`, `source_module`, `target_symbol` and `target_module` (`expression_correlation` and `regulation_type` are optional). [IReNA](https://github.com/jiang-junyao/IReNA) output for mouse or zebrafish is accepted as is.
 
 ## Outputs
 
-Each run writes to its `out` directory:
+Each run writes to its output directory:
 
 | File | Content |
 | --- | --- |
-| `*_packets.jsonl` | one distilled evidence packet per candidate (context, selected passages, PMIDs) |
-| `distilled_*_packets.csv` | the same packets as a table |
-| `gene_scores.csv` / `gene_pair_scores.csv` / `module_pair_scores.csv` | final table: score, evidence level, supporting PMIDs, rationale and caveats |
+| `gene_scores.csv` / `gene_pair_scores.csv` / `module_pair_scores.csv` | final table: evidence score, evidence level, supporting PMIDs, rationale and caveats |
+| `*_packets.jsonl`, `distilled_*_packets.csv` | the distilled evidence packet for each candidate |
 | `*_response.txt`, `*_api_response.jsonl` | raw LLM responses, kept for auditing |
 
-For gene pairs and modules the final table keeps your `data_score` next to `fatereasoner_score`, and `evidence_quadrant` labels each candidate as `concordant_high`, `data_high_llm_lower`, `llm_high_data_lower` or `lower_concordance`.
+For gene pairs and modules, the evidence score is in `fatereasoner_score`. Your `data_score` is kept next to it, and `evidence_quadrant` labels each candidate as `concordant_high`, `data_high_llm_lower`, `llm_high_data_lower` or `lower_concordance`, which makes candidates supported by the data but not yet by the literature (and the reverse) easy to find.
 
 ## Useful options
 
-| Option | Purpose |
-| --- | --- |
-| `prepare_only=True` | build evidence packets only, no LLM call |
-| `exclude_pmids="123;456"` | exclude specific PMIDs from retrieval, e.g. the paper your data came from |
-| `date_cutoff="2020/12/31"` | use only literature published up to a date |
-| `method=` | `distilled_plus_prior` (default) or the ablations `prior_only`, `distilled_only_no_prior`, `raw_abstract_plus_prior`, `biomedbert_plus_prior` |
-| `resume=True` | reuse cached retrieval and scores after an interruption |
+All options can be set in the config object (Python) or as flags (command line).
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `full_text` | `"pmc-oa"` | use open-access PubMed Central full texts when available; `"none"` uses titles and abstracts only |
+| `exclude_pmids` | `""` | PMIDs to exclude from retrieval, e.g. the study your candidates came from |
+| `date_cutoff` | `None` | use only literature published up to a date |
+| `prepare_only` | `False` | build evidence packets only, without calling the LLM |
+| `resume` | `False` | reuse cached retrieval and scores after an interruption |
+| `method` | `"distilled_plus_prior"` | FateReasoner scoring, or the ablations `prior_only`, `distilled_only_no_prior`, `raw_abstract_plus_prior`, `biomedbert_plus_prior` |
+| `temperature` | `0.0` | LLM sampling temperature |
+
+## How it works
+
+1. **Retrieve.** PubMed is queried with the candidate genes combined with terms from your context.
+2. **Distill.** Sentences that mention the candidate or the context form short text windows. Windows are ranked by a fixed hierarchy of criteria (candidate mention, context terms, marker genes, functional terms, absence of off-context or species-mismatched content, PubMed rank), and the best are assembled into a compact evidence packet together with the supporting PMIDs.
+3. **Score.** The LLM reads the packet, weighs it together with its prior knowledge, and returns an evidence score between 0 and 1, an evidence level, the supporting PMIDs and a short rationale. Scoring instructions are adapted to genes, directed gene pairs and module pairs.
 
 ## Citation
 
 If you use FateReasoner, please cite:
 
-> Jiang J. *et al.* Decoding cell fate decisions across regulatory layers with evidence-grounded LLM reasoning. (manuscript in preparation)
+> Jiang J., Yang R., Kong A., Huang D. and Chen X. Decoding cell fate decisions across regulatory layers with evidence-grounded LLM reasoning. *Manuscript submitted.*
 
 ## License
 

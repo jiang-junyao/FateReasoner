@@ -27,7 +27,7 @@ class PubMedClient:
         date_cutoff: str | None = None,
         delay_seconds: float = 0.34,
         timeout: int = 30,
-        full_text_mode: str = "none",
+        full_text_mode: str = "pmc-oa",
         exclude_pmids: Iterable[str] | None = None,
     ) -> None:
         self.email = email or os.getenv("NCBI_EMAIL")
@@ -96,11 +96,22 @@ class PubMedClient:
         docs = _parse_pubmed_xml(response.text)
         return [doc for doc in docs if doc.pmid not in self.exclude_pmids]
 
+    def fetch_with_full_text(self, pmids: Iterable[str]) -> list[EvidenceDocument]:
+        """Fetch PubMed records and, if enabled, attach open-access PMC full texts."""
+        docs = self.fetch(pmids)
+        if self.full_text_mode == "pmc-oa":
+            self._add_pmc_full_text(docs)
+        return docs
+
     def _add_pmc_full_text(self, docs: list[EvidenceDocument]) -> None:
-        pmcids = [doc.pmcid for doc in docs if doc.pmcid]
+        pmcids = [doc.pmcid for doc in docs if doc.pmcid and not doc.full_text]
         if not pmcids:
             return
-        full_texts = self.fetch_pmc_full_texts(pmcids)
+        try:
+            full_texts = self.fetch_pmc_full_texts(pmcids)
+        except RuntimeError:
+            # Full text is optional: keep titles and abstracts if PMC is unavailable.
+            return
         for doc in docs:
             if doc.pmcid and doc.pmcid in full_texts:
                 doc.full_text = full_texts[doc.pmcid]

@@ -25,7 +25,7 @@ CORPUS = [
     EvidenceDocument("1005", "THBS1 promotes HNSCC migration through SDC1", "Thrombospondin-1 (THBS1) secreted by fibroblasts binds SDC1 "
                      "to promote migration and invasion of head and neck squamous cell carcinoma.", "Oncogene", "2025"),
     EvidenceDocument("1006", "SPP1-CD44 axis in tumor-associated macrophages", "SPP1+ macrophages signal through CD44 on tumor cells; "
-                     "COL1A1 from cancer-associated fibroblasts also engages CD44. APOE and SORL1 are expressed in macrophages.",
+                     "COL1A1 from cancer-associated fibroblasts also engages CD44. APOE and LSR are expressed in macrophages.",
                      "Nat Commun", "2023"),
 ]
 
